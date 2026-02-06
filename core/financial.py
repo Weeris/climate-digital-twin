@@ -424,34 +424,52 @@ class PortfolioRiskCalculator:
         Calculate portfolio-level risk.
         
         Args:
-            exposures: List of exposure dictionaries
+            exposures: List of PortfolioAsset objects or dictionaries
             climate_scenario: Optional climate scenario parameters
             
         Returns:
             Portfolio risk metrics
         """
-        total_exposure = sum(e["value"] for e in exposures)
+        # Handle both PortfolioAsset objects and dictionaries
+        total_exposure = sum(e.value if hasattr(e, 'value') else e["value"] for e in exposures)
         
         # Calculate individual risks
         individual_risks = []
-        for exp in exposures:
+        for i, exp in enumerate(exposures):
+            # Extract values based on type
+            if hasattr(exp, 'value'):
+                # PortfolioAsset object
+                exp_value = exp.value
+                exp_pd = getattr(exp, 'base_pd', 0.02)
+                exp_lgd = getattr(exp, 'base_lgd', 0.4)
+                exp_beta = getattr(exp, 'climate_beta', 0.5)
+                exp_damage = getattr(exp, 'damage_ratio', 0)
+                exp_id = getattr(exp, 'asset_id', f"exp_{i}")
+            else:
+                # Dictionary
+                exp_value = exp["value"]
+                exp_pd = exp.get("pd", exp.get("base_pd", 0.02))
+                exp_lgd = exp.get("lgd", exp.get("base_lgd", 0.4))
+                exp_beta = exp.get("climate_beta", 0.5)
+                exp_damage = exp.get("damage_ratio", 0)
+                exp_id = exp.get("id", exp.get("asset_id", f"exp_{i}"))
+            
             vasicek = ClimateVasicek(
-                base_pd=exp.get("pd", 0.02),
-                base_lgd=exp.get("lgd", 0.4),
-                climate_beta=exp.get("climate_beta", 0.5)
+                base_pd=exp_pd,
+                base_lgd=exp_lgd,
+                climate_beta=exp_beta
             )
             
-            damage_ratio = exp.get("damage_ratio", 0)
             analysis = vasicek.run_full_analysis(
-                exposure=exp["value"],
-                time_horizon=exp.get("time_horizon", 10),
-                physical_damage_ratio=damage_ratio
+                exposure=exp_value,
+                time_horizon=10,
+                physical_damage_ratio=exp_damage
             )
             
             individual_risks.append({
-                "exposure_id": exp.get("id", f"exp_{len(individual_risks)}"),
-                "value": exp["value"],
-                "weight": exp["value"] / total_exposure,
+                "exposure_id": exp_id,
+                "value": exp_value,
+                "weight": exp_value / total_exposure,
                 "expected_loss": analysis["expected_loss"]["additional"],
                 "unexpected_loss": analysis["unexpected_loss"]["additional"],
                 "capital_impact": analysis["capital"]["additional"]

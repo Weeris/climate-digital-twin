@@ -464,7 +464,8 @@ def show_monte_carlo_page(currency: str):
             m4.metric("Prob. of Loss", f"{risk['probability_of_loss']*100:.1f}%")
             
             fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-            axes[0].hist(result.get("return_distribution_array", np.random.normal(0, 0.15, 10000)) * 100, bins=50, edgecolor='black', alpha=0.7, color='steelblue')
+            returns_array = result.get("return_distribution_array", np.random.normal(0, 0.15, 10000))
+            axes[0].hist(returns_array * 100, bins=50, edgecolor="black", alpha=0.7, color="steelblue")
             axes[0].axvline(x=risk['value_at_risk'] * 100, color='r', linestyle='--', linewidth=2)
             axes[0].axvline(x=risk['expected_shortfall'] * 100, color='orange', linestyle='--', linewidth=2)
             axes[0].set_xlabel('Return (%)')

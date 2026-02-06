@@ -204,6 +204,7 @@ class MonteCarloEngine:
                 "percentile_75": float(np.percentile(returns, 75)),
                 "percentile_95": float(np.percentile(returns, 95))
             },
+            "return_distribution_array": returns,  # Raw returns for plotting
             "risk_metrics": metrics,
             "portfolio_paths": portfolio_values,
             "asset_paths": asset_values,
@@ -305,6 +306,21 @@ class MonteCarloEngine:
         var_dollar = np.abs(var_value) * np.mean(initial_values)
         es_dollar = np.abs(expected_shortfall) * np.mean(initial_values)
         
+        # Calculate skewness and kurtosis manually
+        n = len(returns)
+        mean_r = np.mean(returns)
+        std_r = np.std(returns)
+        
+        if n > 2 and std_r > 0:
+            skewness = np.mean(((returns - mean_r) / std_r) ** 3)
+        else:
+            skewness = 0
+        
+        if n > 3 and std_r > 0:
+            kurtosis = np.mean(((returns - mean_r) / std_r) ** 4) - 3
+        else:
+            kurtosis = 0
+        
         return {
             "value_at_risk": var_value,
             "value_at_risk_dollar": var_dollar,
@@ -316,8 +332,8 @@ class MonteCarloEngine:
             "probability_of_75pct_loss": float(prob_75pct_loss),
             "confidence_level": self.config.confidence_level,
             "volatility_annualized": float(np.std(returns) * np.sqrt(252)),
-            "skewness": float(np.skew(returns)) if len(returns) > 2 else 0,
-            "kurtosis": float(np.kurtosis(returns)) if len(returns) > 3 else 0
+            "skewness": float(skewness),
+            "kurtosis": float(kurtosis)
         }
 
 
