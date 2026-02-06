@@ -607,13 +607,13 @@ def main():
     # Page navigation
     page = st.session_state.get("nav_page", "home")
     pages = {
-        "home": show_home_page,
-        "data": show_data_input_page,
-        "hazard": show_hazard_page,
-        "financial": show_financial_page,
-        "monte_carlo": show_monte_carlo_page,
-        "scenario": show_scenario_page,
-        "reports": show_reports_page
+        "home": lambda: show_home_page(),
+        "data": lambda: show_data_input_page(currency),
+        "hazard": lambda: show_hazard_page(currency),
+        "financial": lambda: show_financial_page(currency),
+        "monte_carlo": lambda: show_monte_carlo_page(currency),
+        "scenario": lambda: show_scenario_page(currency),
+        "reports": lambda: show_reports_page(currency)
     }
     
     if page in pages:
