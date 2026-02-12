@@ -523,7 +523,7 @@ def show_scenario_page(currency: str):
         time_horizon = st.slider("Time Horizon (years)", 5, 50, 10, 5)
         
         if workflow.portfolio_data is not None:
-            portfolio = [PortfolioAsset(asset_id=row["asset_id"], value=row["value"], asset_type=row["asset_type"], region=row["region"], climate_beta=0.5) for _, row in workflow.portfolio_data.iterrows()]
+            portfolio = [PortfolioAsset(asset_id=row["asset_id"], value=row["value"], asset_type=row["asset_type"], region=row.get("district", row.get("region", "central")), climate_beta=0.5) for _, row in workflow.portfolio_data.iterrows()]
         else:
             portfolio = [PortfolioAsset(f"HK_{i}", 50000000, "residential_high_rise", "central", 0.3) for i in range(10)]
         
