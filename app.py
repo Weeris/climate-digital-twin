@@ -477,7 +477,8 @@ def show_monte_carlo_page(currency: str):
             risk = result["risk_metrics"]
             
             m1, m2, m3, m4 = st.columns(4)
-            m1.metric("Mean Return", f"{risk['mean']*100:.1f}%")
+            mean_return = result.get("return_distribution", {}).get("mean", 0)
+            m1.metric("Mean Return", f"{mean_return*100:.1f}%")
             m2.metric("Value at Risk", f"{risk['value_at_risk']*100:.1f}%")
             m3.metric("Expected Shortfall", f"{risk['expected_shortfall']*100:.1f}%")
             m4.metric("Prob. of Loss", f"{risk['probability_of_loss']*100:.1f}%")
