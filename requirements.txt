@@ -8,6 +8,9 @@ geopandas>=0.10.0
 shapely>=2.0.0
 
 # HK Visualization Dependencies
-folium>=2.0.0
-branca>=0.7.0
-streamlit-folium>=0.15.0
+folium==0.20.0
+branca==0.7.0
+streamlit-folium==0.20.0
+
+# Weather API
+aiohttp==3.11.0
