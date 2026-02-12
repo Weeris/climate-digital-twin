@@ -444,7 +444,7 @@ def show_monte_carlo_page(currency: str):
         
         if workflow.portfolio_data is not None:
             portfolio = [
-                PortfolioAsset(asset_id=row["asset_id"], value=row["value"], asset_type=row["asset_type"], region=row["region"], damage_ratio=row.get("damage_ratio", 0.1), climate_beta=0.5)
+                PortfolioAsset(asset_id=row["asset_id"], value=row["value"], asset_type=row["asset_type"], region=row.get("district", row.get("region", "central")), damage_ratio=row.get("damage_ratio", 0.1), climate_beta=0.5)
                 for _, row in workflow.portfolio_data.iterrows()
             ]
             st.info(f"Using portfolio with {len(portfolio)} assets")
