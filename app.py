@@ -199,13 +199,15 @@ def show_data_input_page(currency: str):
         
         if input_method == "Use Sample Portfolio":
             portfolio = pd.DataFrame({
-                "asset_id": ["RE001", "RE002", "RE003", "RE004", "RE005"],
-                "asset_type": ["residential", "residential", "commercial", "industrial", "commercial"],
-                "region": ["Bangkok Central", "Bangkok Periphery", "Chonburi", "Ayutthaya", "Rayong"],
+                "asset_id": ["HK001", "HK002", "HK003", "HK004", "HK005"],
+                "asset_type": ["residential_high_rise", "residential_high_rise", "commercial_office", "industrial_warehouse", "commercial_retail"],
+                "district": ["central", "wan_chai", "tst", "kwun_tong", "causeway_bay"],
                 "value": [50000000, 30000000, 80000000, 120000000, 60000000],
-                "base_pd": [0.02, 0.015, 0.03, 0.04, 0.025],
-                "base_lgd": [0.4, 0.4, 0.45, 0.5, 0.4],
-                "damage_ratio": [0.15, 0.10, 0.20, 0.35, 0.18]
+                "base_pd": [0.015, 0.018, 0.025, 0.035, 0.02],
+                "base_lgd": [0.35, 0.38, 0.42, 0.45, 0.4],
+                "damage_ratio": [0.12, 0.15, 0.18, 0.28, 0.14],
+                "floor": [35, 22, 45, 8, 12],
+                "building_age": [8, 15, 5, 20, 25]
             })
             st.dataframe(portfolio, use_container_width=True)
             
