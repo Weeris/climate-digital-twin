@@ -186,7 +186,9 @@ def show_home_page(currency: str = "HKD"):
         workflow.hazard_result = hazard_result
         workflow.financial_result = financial_result
         
-        st.success("Demo complete! Navigate through the sidebar to see results.")
+        st.success("Demo complete! → Loading results...")
+        st.session_state.nav_page = "data"
+        st.rerun()
 
 
 def show_data_input_page(currency: str):
