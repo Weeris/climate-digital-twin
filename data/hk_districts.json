@@ -1,0 +1,183 @@
+{
+  "districts": {
+    "central": {
+      "name": "central",
+      "display_name": "Central",
+      "coordinates": [22.2823, 114.1589],
+      "risk_levels": {
+        "flood": "high",
+        "typhoon": "high",
+        "wildfire": "low",
+        "drought": "medium"
+      },
+      "avg_property_value_hkd": 28000000,
+      "population": 132000,
+      "description": "Core business district, high flood risk from storm surge"
+    },
+    "wan_chai": {
+      "name": "wan_chai",
+      "display_name": "Wan Chai",
+      "coordinates": [22.2816, 114.1725],
+      "risk_levels": {
+        "flood": "high",
+        "typhoon": "high",
+        "wildfire": "low",
+        "drought": "medium"
+      },
+      "avg_property_value_hkd": 24000000,
+      "population": 152000,
+      "description": "Convention and entertainment hub, coastal exposure"
+    },
+    "causeway_bay": {
+      "name": "causeway_bay",
+      "display_name": "Causeway Bay",
+      "coordinates": [22.2793, 114.1821],
+      "risk_levels": {
+        "flood": "high",
+        "typhoon": "high",
+        "wildfire": "low",
+        "drought": "medium"
+      },
+      "avg_property_value_hkd": 25000000,
+      "population": 183000,
+      "description": "Major shopping district, high commercial value"
+    },
+    "tsim_sha_tsui": {
+      "name": "tsim_sha_tsui",
+      "display_name": "Kowloon TST",
+      "coordinates": [22.3039, 114.1704],
+      "risk_levels": {
+        "flood": "high",
+        "typhoon": "high",
+        "wildfire": "low",
+        "drought": "medium"
+      },
+      "avg_property_value_hkd": 22000000,
+      "population": 164000,
+      "description": "Tourism hub, historical flood issues"
+    },
+    "hung_hom": {
+      "name": "hung_hom",
+      "display_name": "Hung Hom",
+      "coordinates": [22.3033, 114.1817],
+      "risk_levels": {
+        "flood": "medium",
+        "typhoon": "high",
+        "wildfire": "low",
+        "drought": "medium"
+      },
+      "avg_property_value_hkd": 18000000,
+      "population": 116000,
+      "description": "Residential area near waterfront"
+    },
+    "kwun_tong": {
+      "name": "kwun_tong",
+      "display_name": "Kwun Tong",
+      "coordinates": [22.3124, 114.2248],
+      "risk_levels": {
+        "flood": "medium",
+        "typhoon": "medium",
+        "wildfire": "low",
+        "drought": "low"
+      },
+      "avg_property_value_hkd": 16000000,
+      "population": 689000,
+      "description": "Industrial and residential area, industrial flood risk"
+    },
+    "sha_tin": {
+      "name": "sha_tin",
+      "display_name": "Sha Tin",
+      "coordinates": [22.3894, 114.2034],
+      "risk_levels": {
+        "flood": "medium",
+        "typhoon": "medium",
+        "wildfire": "medium",
+        "drought": "medium"
+      },
+      "avg_property_value_hkd": 17000000,
+      "population": 686000,
+      "description": "New town, reservoirs nearby"
+    },
+    "tuen_mun": {
+      "name": "tuen_mun",
+      "display_name": "Tuen Mun",
+      "coordinates": [22.3909, 113.9728],
+      "risk_levels": {
+        "flood": "very_high",
+        "typhoon": "high",
+        "wildfire": "medium",
+        "drought": "high"
+      },
+      "avg_property_value_hkd": 14000000,
+      "population": 507000,
+      "description": "Low-lying industrial area, high flood risk"
+    },
+    "yuen_long": {
+      "name": "yuen_long",
+      "display_name": "Yuen Long",
+      "coordinates": [22.4445, 114.0221],
+      "risk_levels": {
+        "flood": "very_high",
+        "typhoon": "high",
+        "wildfire": "medium",
+        "drought": "high"
+      },
+      "avg_property_value_hkd": 13000000,
+      "population": 614000,
+      "description": "Flood-prone agricultural and residential area"
+    },
+    "tin_shui_wai": {
+      "name": "tin_shui_wai",
+      "display_name": "Tin Shui Wai",
+      "coordinates": [22.4623, 113.9968],
+      "risk_levels": {
+        "flood": "very_high",
+        "typhoon": "high",
+        "wildfire": "low",
+        "drought": "high"
+      },
+      "avg_property_value_hkd": 12000000,
+      "population": 287000,
+      "description": "Wetland area, highest flood risk in HK"
+    },
+    "lantau": {
+      "name": "lantau",
+      "display_name": "Lantau (Tung Chung)",
+      "coordinates": [22.2886, 113.9356],
+      "risk_levels": {
+        "flood": "medium",
+        "typhoon": "high",
+        "wildfire": "medium",
+        "drought": "low"
+      },
+      "avg_property_value_hkd": 15000000,
+      "population": 112000,
+      "description": "Airport and new town, country park fire risk"
+    },
+    "cheung_chau": {
+      "name": "cheung_chau",
+      "display_name": "Cheung Chau",
+      "coordinates": [22.2256, 114.0275],
+      "risk_levels": {
+        "flood": "medium",
+        "typhoon": "high",
+        "wildfire": "low",
+        "drought": "low"
+      },
+      "avg_property_value_hkd": 12000000,
+      "population": 23000,
+      "description": "Island community, isolated flood risk"
+    }
+  },
+  "risk_colors": {
+    "very_high": "#FF0000",
+    "high": "#FF6600",
+    "medium": "#FFCC00",
+    "low": "#00CC00"
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2026-02-12",
+    "source": "Climate Digital Twin Project"
+  }
+}

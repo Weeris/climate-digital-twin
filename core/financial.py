@@ -6,11 +6,47 @@ Provides credit risk calculations with climate risk adjustments:
 - Expected Loss (EL) calculations
 - Unexpected Loss (UL) calculations
 - Capital adequacy assessment
+- HKD currency support with HK-specific parameters
 """
 
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Optional
 import numpy as np
 from dataclasses import dataclass
+import json
+from pathlib import Path
+
+
+# HK Financial Parameters
+DATA_DIR = Path(__file__).parent.parent / "data"
+PARAMS_FILE = DATA_DIR / "hk_financial_params.json"
+
+
+def load_hk_financial_params() -> Dict:
+    """Load HK-specific financial parameters."""
+    if PARAMS_FILE.exists():
+        with open(PARAMS_FILE, 'r') as f:
+            return json.load(f)
+    return {}
+
+
+@dataclass
+class Currency:
+    """Currency parameters."""
+    code: str
+    symbol: str
+    exchange_rate_usd: float = 1.0
+    
+    def to_usd(self, amount: float) -> float:
+        return amount / self.exchange_rate_usd
+    
+    def format(self, amount: float) -> str:
+        return f"{self.symbol}{amount:,.2f}"
+
+
+# Currency instances
+HKD = Currency(code="HKD", symbol="$", exchange_rate_usd=7.75)
+USD = Currency(code="USD", symbol="$", exchange_rate_usd=1.0)
+CNY = Currency(code="CNY", symbol="¥", exchange_rate_usd=7.25)
 
 
 @dataclass
@@ -347,7 +383,7 @@ class ClimateVasicek:
         )
         
         # Capital requirements
-        base_capital = self.calculate_capitalrequirement(base_ul)
+        base_capital = self.calculate_capital_requirement(base_ul)
         stressed_capital = self.calculate_capital_requirement(stressed_ul)
         
         return {
@@ -516,3 +552,198 @@ class PortfolioRiskCalculator:
             "hhi": hhi,
             "concentration_level": "high" if hhi > 0.25 else "medium" if hhi > 0.15 else "low"
         }
+
+
+class ClimateVasicekHK(ClimateVasicek):
+    """
+    Hong Kong-specific Extended Vasicek Model.
+    
+    Extends the base ClimateVasicek model with HK-specific parameters
+    including:
+    - HK mortgage market parameters (LTV, stress testing)
+    - HK property insurance considerations
+    - HKD currency and conversion
+    - HK regulatory capital requirements
+    
+    The HK model incorporates:
+    - Higher climate sensitivity due to typhoon exposure
+    - Flood risk for low-lying areas
+    - Storm surge considerations for coastal properties
+    """
+    
+    def __init__(
+        self,
+        base_pd: float = 0.015,  # Lower base PD for HK mortgages
+        base_lgd: float = 0.35,  # Typical HK mortgage LGD
+        climate_beta: float = 0.6,  # Higher sensitivity for HK
+        correlation: float = 0.25,  # HK asset correlation
+        recovery_rate: float = None,
+        hk_params: Dict = None
+    ):
+        """
+        Initialize HK-specific Vasicek model.
+        
+        Args:
+            base_pd: Baseline Probability of Default (HK default: 1.5%)
+            base_lgd: Baseline Loss Given Default (HK default: 35%)
+            climate_beta: Climate sensitivity coefficient (HK default: 0.6)
+            correlation: Asset correlation (HK default: 0.25)
+            recovery_rate: Recovery rate (derived from LGD if not provided)
+            hk_params: Optional HK-specific parameters dict
+        """
+        super().__init__(
+            base_pd=base_pd,
+            base_lgd=base_lgd,
+            climate_beta=climate_beta,
+            correlation=correlation,
+            recovery_rate=recovery_rate
+        )
+        
+        # HK-specific parameters
+        self.hk_params = hk_params or load_hk_financial_params()
+        
+        # HK market parameters
+        self.prime_rate = self.hk_params.get('mortgage_parameters', {}).get('prime_rate', 0.05875)
+        self.stress_rate_add = self.hk_params.get('mortgage_parameters', {}).get('stress_test_rate_add', 0.03)
+        
+        # Climate factor adjustment for HK
+        # HK has higher typhoon and flood exposure
+        self.typhoon_factor = 1.3
+        self.flood_factor = 1.2
+    
+    def calculate_hk_climate_adjustment(
+        self,
+        physical_damage_ratio: float,
+        hazard_type: str = "typhoon"
+    ) -> Dict:
+        """
+        Calculate HK-specific climate risk adjustments.
+        
+        Args:
+            physical_damage_ratio: Ratio of physical damage (0.0 to 1.0)
+            hazard_type: typhoon, flood, combined
+            
+        Returns:
+            Dictionary with HK-specific adjustment factors
+        """
+        # Base adjustment from parent
+        base = super().calculate_climate_adjustment(physical_damage_ratio)
+        
+        # Apply HK hazard multipliers
+        hazard_multiplier = {
+            "typhoon": self.typhoon_factor,
+            "flood": self.flood_factor,
+            "combined": (self.typhoon_factor + self.flood_factor) / 2
+        }.get(hazard_type, 1.0)
+        
+        # HK-specific adjustments
+        hk_adjustment = {
+            "hazard_type": hazard_type,
+            "hazard_multiplier": hazard_multiplier,
+            "hk_pd_multiplier": base["pd_multiplier"] * hazard_multiplier,
+            "hk_lgd_multiplier": base["lgd_multiplier"] * (1 + 0.1 * (hazard_multiplier - 1)),
+            "hk_adjusted_pd": self.base_pd * base["pd_multiplier"] * hazard_multiplier,
+            "hk_adjusted_lgd": min(1.0, self.base_lgd * base["lgd_multiplier"] * (1 + 0.1 * (hazard_multiplier - 1))),
+            "prime_rate": self.prime_rate,
+            "stress_rate": self.prime_rate + self.stress_rate_add
+        }
+        
+        return {**base, **hk_adjustment}
+    
+    def calculate_hk_capital_requirement(
+        self,
+        exposure: float,
+        physical_damage_ratio: float,
+        hazard_type: str = "typhoon",
+        confidence_level: float = 0.999
+    ) -> Dict:
+        """
+        Calculate HK regulatory capital requirement.
+        
+        HK regulatory requirements:
+        - 8% minimum capital ratio (Basel)
+        - 15% climate risk buffer
+        - Stress testing at +3% interest rate
+        
+        Args:
+            exposure: Exposure at Default (HKD)
+            physical_damage_ratio: Physical damage ratio
+            hazard_type: typhoon, flood, combined
+            confidence_level: Confidence level for capital
+            
+        Returns:
+            Dictionary with capital calculations in HKD
+        """
+        # Get HK climate adjustments
+        adjustment = self.calculate_hk_climate_adjustment(physical_damage_ratio, hazard_type)
+        
+        # Use stressed PD for capital calculation
+        stressed_pd = adjustment["hk_adjusted_pd"]
+        stressed_lgd = adjustment["hk_adjusted_lgd"]
+        
+        # Unexpected Loss
+        ul = self.calculate_unexpected_loss(
+            exposure, stressed_pd, stressed_lgd
+        )
+        
+        # Base capital (8% minimum)
+        z_score = {
+            0.90: 1.28,
+            0.95: 1.645,
+            0.99: 2.33,
+            0.999: 3.09
+        }.get(confidence_level, 3.09)
+        
+        capital_ratio = 0.08
+        base_capital = ul * capital_ratio
+        adjusted_capital = ul * capital_ratio * z_score / 3.09
+        
+        # Add climate risk buffer (15% for HK)
+        climate_buffer = adjusted_capital * 0.15
+        
+        # Stress test impact (mortgage stress rate)
+        stress_rate = self.prime_rate + self.stress_rate_add
+        stress_impact = exposure * (stress_rate - self.prime_rate) * 0.1
+        
+        return {
+            "exposure_hkd": exposure,
+            "stressed_pd": stressed_pd,
+            "stressed_lgd": stressed_lgd,
+            "unexpected_loss": ul,
+            "base_capital_hkd": base_capital,
+            "adjusted_capital_hkd": adjusted_capital,
+            "climate_buffer_hkd": climate_buffer,
+            "total_capital_hkd": adjusted_capital + climate_buffer + stress_impact,
+            "stress_impact_hkd": stress_impact,
+            "confidence_level": confidence_level,
+            "prime_rate": self.prime_rate,
+            "stress_rate": stress_rate,
+            "hk_regulatory_requirement": True
+        }
+    
+    def run_hk_full_analysis(
+        self,
+        exposure_hkd: float,
+        time_horizon: int = 10,
+        physical_damage_ratio: float = 0.1,
+        hazard_type: str = "typhoon",
+        n_simulations: int = 10000
+    ) -> Dict:
+        """
+        Run complete HK climate credit risk analysis.
+        
+        Args:
+            exposure_hkd: Exposure at Default in HKD
+            time_horizon: Analysis horizon in years
+            physical_damage_ratio: Physical damage ratio
+            hazard_type: typhoon, flood, combined
+            n_simulations: Number of Monte Carlo simulations
+            
+        Returns:
+            Complete HK-specific analysis results
+        """
+        # HK climate adjustment
+        adjustment = self.calculate_hk_climate_adjustment(physical_damage_ratio, hazard_type)
+        
+        # Monte Carlo simulation
+        pd_result = self.calculate_adjusted_pd_monte

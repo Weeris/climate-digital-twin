@@ -129,35 +129,50 @@ class HazardAssessment:
     def _flood_damage_curve(
         self,
         depth_m: float,
-        asset_type: str = "residential"
+        asset_type: str = "residential",
+        construction_type: str = "reinforced_concrete"
     ) -> float:
         """
         Depth-damage curve for flood events.
-        
+
         Based on typical insurance damage functions:
         - 0-0.3m: Minor damage (5-15%)
         - 0.3-1.0m: Moderate damage (15-40%)
         - 1.0-2.0m: Severe damage (40-70%)
         - >2.0m: Major damage (70-100%)
-        
+
         Args:
             depth_m: Flood water depth in meters
             asset_type: Type of asset
-            
+            construction_type: Building construction type
+
         Returns:
             Damage ratio as float (0.0 to 1.0)
         """
+        # Construction type resilience
+        resilience_factors = {
+            "reinforced_concrete": 0.8,
+            "masonry": 1.0,
+            "wood": 1.4,
+            "steel": 0.9,
+            "traditional": 1.3
+        }
+
         # Base damage curve
         if depth_m <= 0:
-            return 0.0
+            base_damage = 0.0
         elif depth_m <= 0.3:
-            return 0.05 + 0.10 * (depth_m / 0.3)
+            base_damage = 0.05 + 0.10 * (depth_m / 0.3)
         elif depth_m <= 1.0:
-            return 0.15 + 0.25 * ((depth_m - 0.3) / 0.7)
+            base_damage = 0.15 + 0.25 * ((depth_m - 0.3) / 0.7)
         elif depth_m <= 2.0:
-            return 0.40 + 0.30 * ((depth_m - 1.0) / 1.0)
+            base_damage = 0.40 + 0.30 * ((depth_m - 1.0) / 1.0)
         else:
-            return min(1.0, 0.70 + 0.15 * min(1.0, (depth_m - 2.0) / 3.0))
+            base_damage = min(1.0, 0.70 + 0.15 * min(1.0, (depth_m - 2.0) / 3.0))
+
+        # Apply construction resilience
+        resilience = resilience_factors.get(construction_type, 1.0)
+        return min(1.0, base_damage * resilience)
     
     def _flood_downtime_base(self, depth_m: float) -> int:
         """
@@ -361,13 +376,16 @@ class RegionalHazardData:
     Regional hazard data provider.
     
     Provides baseline hazard parameters for different regions.
+    Supports both Bangkok/Thailand regions and Hong Kong zones.
     """
     
     # Example data structure for regional flood parameters
     FLOOD_ZONES = {
+        # Bangkok/Thailand regions
         "bangkok_central": {
             "flood_risk_level": "high",
             "avg_depth_10yr_m": 0.3,
+            "avg_depth_50yr_m": 0.7,
             "avg_depth_100yr_m": 1.2,
             "avg_depth_500yr_m": 2.0,
             "frequency_increase_rate": 0.02  # 2% per year
@@ -375,6 +393,7 @@ class RegionalHazardData:
         "bangkok_peripheral": {
             "flood_risk_level": "medium",
             "avg_depth_10yr_m": 0.2,
+            "avg_depth_50yr_m": 0.5,
             "avg_depth_100yr_m": 0.8,
             "avg_depth_500yr_m": 1.5,
             "frequency_increase_rate": 0.015
@@ -382,9 +401,62 @@ class RegionalHazardData:
         "ayutthaya_industrial": {
             "flood_risk_level": "very_high",
             "avg_depth_10yr_m": 0.8,
+            "avg_depth_50yr_m": 1.5,
             "avg_depth_100yr_m": 2.5,
             "avg_depth_500yr_m": 3.5,
             "frequency_increase_rate": 0.03
+        },
+        
+        # Hong Kong Zones
+        "hk_central": {
+            "flood_risk_level": "high",
+            "avg_depth_10yr_m": 0.5,
+            "avg_depth_50yr_m": 1.0,
+            "avg_depth_100yr_m": 1.5,
+            "avg_depth_500yr_m": 2.5,
+            "storm_surge_risk": True,
+            "storm_surge_additional_m": 0.8,
+            "frequency_increase_rate": 0.025
+        },
+        "hk_kowloon": {
+            "flood_risk_level": "high",
+            "avg_depth_10yr_m": 0.4,
+            "avg_depth_50yr_m": 0.9,
+            "avg_depth_100yr_m": 1.4,
+            "avg_depth_500yr_m": 2.3,
+            "storm_surge_risk": True,
+            "storm_surge_additional_m": 0.7,
+            "frequency_increase_rate": 0.025
+        },
+        "hk_new_territories_west": {
+            "flood_risk_level": "very_high",
+            "avg_depth_10yr_m": 0.6,
+            "avg_depth_50yr_m": 1.2,
+            "avg_depth_100yr_m": 1.8,
+            "avg_depth_500yr_m": 3.0,
+            "storm_surge_risk": True,
+            "storm_surge_additional_m": 1.0,
+            "frequency_increase_rate": 0.035
+        },
+        "hk_new_territories_east": {
+            "flood_risk_level": "medium",
+            "avg_depth_10yr_m": 0.2,
+            "avg_depth_50yr_m": 0.5,
+            "avg_depth_100yr_m": 0.8,
+            "avg_depth_500yr_m": 1.5,
+            "storm_surge_risk": False,
+            "storm_surge_additional_m": 0.0,
+            "frequency_increase_rate": 0.015
+        },
+        "hk_islands": {
+            "flood_risk_level": "medium",
+            "avg_depth_10yr_m": 0.3,
+            "avg_depth_50yr_m": 0.6,
+            "avg_depth_100yr_m": 1.0,
+            "avg_depth_500yr_m": 2.0,
+            "storm_surge_risk": True,
+            "storm_surge_additional_m": 0.9,
+            "frequency_increase_rate": 0.020
         }
     }
     
@@ -392,7 +464,8 @@ class RegionalHazardData:
         self,
         region: str,
         hazard_type: str,
-        return_period: int = 100
+        return_period: int = 100,
+        include_storm_surge: bool = False
     ) -> Dict:
         """
         Get baseline hazard parameters for a region.
@@ -401,6 +474,7 @@ class RegionalHazardData:
             region: Region identifier
             hazard_type: Type of hazard
             return_period: Return period in years
+            include_storm_surge: Include storm surge depth for coastal zones
             
         Returns:
             Dictionary with hazard parameters
@@ -411,16 +485,306 @@ class RegionalHazardData:
             depth_key = f"avg_depth_{return_period}yr_m"
             base_depth = zone_data.get(depth_key, zone_data["avg_depth_100yr_m"])
             
-            return {
+            result = {
                 "region": region,
                 "hazard_type": hazard_type,
                 "risk_level": zone_data["flood_risk_level"],
                 "base_depth_m": base_depth,
                 "frequency_increase_rate": zone_data["frequency_increase_rate"]
             }
+            
+            # Add storm surge parameters for HK zones
+            if "storm_surge_risk" in zone_data:
+                result["storm_surge_risk"] = zone_data["storm_surge_risk"]
+                if include_storm_surge and zone_data.get("storm_surge_risk"):
+                    result["base_depth_m"] += zone_data.get("storm_surge_additional_m", 0)
+                    result["storm_surge_additional_m"] = zone_data.get("storm_surge_additional_m", 0)
+            
+            return result
         
         return {
             "region": region,
             "hazard_type": hazard_type,
             "risk_level": "unknown"
         }
+
+
+# =====================
+# HK-SPECIFIC METHODS
+# =====================
+
+class HKHazardAssessment:
+    """
+    Hong Kong-specific hazard assessment methods.
+    
+    Extends the base HazardAssessment with HK-specific damage functions
+    for high-rise buildings, MTR infrastructure, and local building types.
+    """
+    
+    # HK building types for asset classification
+    HK_BUILDING_TYPES = [
+        "residential_high_rise",
+        "residential_walkup",
+        "commercial_office",
+        "commercial_mall",
+        "commercial_hotel",
+        "industrial_factory",
+        "industrial_warehouse",
+        "infrastructure_mtr",
+        "infrastructure_tunnel",
+        "infrastructure_bridge",
+    ]
+    
+    def __init__(self):
+        """Initialize HK hazard assessment."""
+        self.base_assessment = HazardAssessment()
+    
+    def assess_hk_flood_risk(
+        self,
+        district: str,
+        building_type: str,
+        flood_depth_m: float,
+        building_value_hkd: float,
+        num_floors: int = 30,
+        has_basement: bool = False,
+        flood_duration_hours: float = 24.0,
+        include_storm_surge: bool = True
+    ) -> Dict:
+        """
+        Assess flood risk for HK property.
+        
+        Args:
+            district: HK district (e.g., "central", "kowloon", "tuen_mun")
+            building_type: Type of building
+            flood_depth_m: Flood water depth in meters
+            building_value_hkd: Building value in HKD
+            num_floors: Number of floors (for high-rise adjustment)
+            has_basement: Has basement carpark
+            flood_duration_hours: Duration of flooding
+            include_storm_surge: Include storm surge if coastal
+            
+        Returns:
+            Dictionary with flood risk assessment
+        """
+        # Storm surge adjustment for coastal districts
+        surge_addition = 0.0
+        coastal_districts = ["central", "wan_chai", "causeway_bay", "tsim_sha_tsui", "hung_hom", "islands"]
+        if include_storm_surge and district.lower() in coastal_districts:
+            surge_addition = 0.7  # Average storm surge for HK
+        
+        adjusted_depth = flood_depth_m + surge_addition
+        
+        # High-rise adjustment (flood affects lower floors only)
+        if building_type == "residential_high_rise" and num_floors > 10:
+            affected_floors_ratio = min(0.25, 5 / num_floors)  # Max 5 floors affected
+            value_multiplier = affected_floors_ratio * 0.8  # Lower floors worth less
+        elif has_basement:
+            value_multiplier = 0.20  # Basement damage
+        else:
+            value_multiplier = min(1.0, (flood_depth_m / 2.0))
+        
+        # Damage calculation
+        damage_ratio = self._hk_flood_damage_curve(adjusted_depth, building_type)
+        physical_damage = building_value_hkd * damage_ratio * value_multiplier
+        
+        # Downtime estimation
+        downtime = self._hk_flood_downtime(building_type, adjusted_depth)
+        
+        return {
+            "hazard_type": "flood",
+            "district": district,
+            "building_type": building_type,
+            "flood_depth_m": flood_depth_m,
+            "storm_surge_addition_m": surge_addition if include_storm_surge else 0,
+            "adjusted_depth_m": adjusted_depth,
+            "damage_ratio": damage_ratio,
+            "value_multiplier": value_multiplier,
+            "physical_damage_hkd": physical_damage,
+            "downtime_days": downtime,
+            "flood_risk_level": self._get_flood_risk_level(district),
+        }
+    
+    def assess_hk_typhoon_risk(
+        self,
+        building_type: str,
+        wind_speed_kmh: float,
+        building_value_hkd: float,
+        construction: str = "reinforced_concrete",
+        has_glass_curtain: bool = False,
+        facade_area_sqm: float = 1000.0,
+        num_windows: int = 100
+    ) -> Dict:
+        """
+        Assess typhoon risk for HK property.
+        
+        Args:
+            building_type: Type of building
+            wind_speed_kmh: Maximum sustained wind speed
+            building_value_hkd: Building value in HKD
+            construction: Construction type
+            has_glass_curtain: Has glass curtain wall
+            facade_area_sqm: Facade area
+            num_windows: Number of windows
+            
+        Returns:
+            Dictionary with typhoon risk assessment
+        """
+        # Window damage
+        window_damage = self._hk_window_breakage(wind_speed_kmh)
+        window_cost = num_windows * window_damage * 5000  # HKD 5,000 per window
+        
+        # Facade damage (glass curtain walls common in HK)
+        facade_damage = 0.0
+        if has_glass_curtain:
+            facade_damage = self._hk_facade_damage(wind_speed_kmh)
+            facade_cost = facade_area_sqm * facade_damage * 8000
+        else:
+            facade_cost = 0.0
+        
+        # Structural damage
+        structural_damage = self._hk_typhoon_structural(wind_speed_kmh, construction)
+        
+        # Signage and ancillary damage
+        ancillary_damage = 0.0
+        if wind_speed_kmh > 100:
+            ancillary_damage = 30000  # Signage, AC units
+        
+        total_damage = window_cost + facade_cost + ancillary_damage
+        damage_ratio = min(1.0, total_damage / building_value_hkd)
+        
+        return {
+            "hazard_type": "typhoon",
+            "building_type": building_type,
+            "wind_speed_kmh": wind_speed_kmh,
+            "signal_equivalent": self._wind_to_signal(wind_speed_kmh),
+            "window_damage_ratio": window_damage,
+            "window_replacement_cost": window_cost,
+            "facade_damage_ratio": facade_damage,
+            "facade_repair_cost": facade_cost,
+            "structural_damage_ratio": structural_damage,
+            "ancillary_damage_cost": ancillary_damage,
+            "total_damage_hkd": total_damage,
+            "damage_ratio": damage_ratio,
+            "downtime_days": self._hk_typhoon_downtime(wind_speed_kmh),
+        }
+    
+    def get_hk_zone_for_location(self, location: str) -> str:
+        """Map location to HK hazard zone."""
+        location_map = {
+            "central": "hk_central", "admiralty": "hk_central",
+            "wan_chai": "hk_central", "causeway_bay": "hk_central",
+            "tsim_sha tsui": "hk_kowloon", "tst": "hk_kowloon",
+            "hung hom": "hk_kowloon", "mong kok": "hk_kowloon",
+            "tuen mun": "hk_new_territories_west", "yuen long": "hk_new_territories_west",
+            "tin shui wai": "hk_new_territories_west",
+            "sha tin": "hk_new_territories_east", "sai kung": "hk_new_territories_east",
+            "lantau": "hk_islands", "cheung chau": "hk_islands",
+        }
+        return location_map.get(location.lower(), "hk_central")
+    
+    def _hk_flood_damage_curve(self, depth_m: float, building_type: str) -> float:
+        """HK-specific flood damage curve."""
+        if depth_m <= 0:
+            return 0.0
+        elif depth_m <= 0.3:
+            return 0.08 + 0.12 * (depth_m / 0.3)
+        elif depth_m <= 1.0:
+            return 0.20 + 0.30 * ((depth_m - 0.3) / 0.7)
+        elif depth_m <= 2.0:
+            return 0.50 + 0.30 * ((depth_m - 1.0) / 1.0)
+        else:
+            return min(1.0, 0.80 + 0.10 * min(1.0, (depth_m - 2.0) / 3.0))
+    
+    def _hk_window_breakage(self, wind_speed: float) -> float:
+        """Window breakage probability by wind speed."""
+        if wind_speed < 80:
+            return 0.0
+        elif wind_speed < 120:
+            return 0.15 + 0.20 * ((wind_speed - 80) / 40)
+        elif wind_speed < 180:
+            return 0.35 + 0.40 * ((wind_speed - 120) / 60)
+        else:
+            return min(1.0, 0.75 + 0.15 * min(1.0, (wind_speed - 180) / 70))
+    
+    def _hk_facade_damage(self, wind_speed: float) -> float:
+        """Glass curtain wall facade damage."""
+        if wind_speed < 100:
+            return 0.0
+        elif wind_speed < 150:
+            return 0.10 + 0.25 * ((wind_speed - 100) / 50)
+        elif wind_speed < 200:
+            return 0.35 + 0.35 * ((wind_speed - 150) / 50)
+        else:
+            return min(1.0, 0.70 + 0.20 * min(1.0, (wind_speed - 200) / 50))
+    
+    def _hk_typhoon_structural(self, wind_speed: float, construction: str) -> float:
+        """Structural damage from typhoon."""
+        thresholds = {
+            "reinforced_concrete": 119,
+            "steel_frame": 130,
+            "glass_curtain_wall": 100,
+            "masonry": 140,
+        }
+        threshold = thresholds.get(construction, 120)
+        
+        if wind_speed < threshold:
+            return 0.0
+        elif wind_speed < 180:
+            return 0.10 + 0.40 * ((wind_speed - threshold) / (180 - threshold))
+        else:
+            return min(1.0, 0.50 + 0.30 * min(1.0, (wind_speed - 180) / 70))
+    
+    def _wind_to_signal(self, wind_speed: float) -> str:
+        """Convert wind speed to HK signal."""
+        if wind_speed < 41:
+            return "Signal 1"
+        elif wind_speed < 63:
+            return "Signal 3"
+        elif wind_speed < 118:
+            return "Signal 8"
+        elif wind_speed < 150:
+            return "Signal 9"
+        else:
+            return "Signal 10"
+    
+    def _hk_flood_downtime(self, building_type: str, depth_m: float) -> int:
+        """Estimate HK flood recovery time."""
+        base_days = {
+            "residential_high_rise": 45,
+            "residential_walkup": 30,
+            "commercial_office": 60,
+            "commercial_mall": 75,
+            "commercial_hotel": 90,
+            "industrial_factory": 45,
+            "industrial_warehouse": 30,
+            "infrastructure_mtr": 120,
+            "infrastructure_tunnel": 180,
+            "infrastructure_bridge": 90,
+        }.get(building_type, 30)
+        
+        depth_factor = 1.0 + max(0, (depth_m - 1.0) * 0.15)
+        return int(base_days * depth_factor)
+    
+    def _hk_typhoon_downtime(self, wind_speed: float) -> int:
+        """Estimate typhoon recovery time."""
+        if wind_speed < 100:
+            return 3
+        elif wind_speed < 150:
+            return 7
+        elif wind_speed < 200:
+            return 14
+        else:
+            return 30
+    
+    def _get_flood_risk_level(self, district: str) -> str:
+        """Get flood risk level for district."""
+        risk_levels = {
+            "central": "high", "wan_chai": "high", "causeway_bay": "high",
+            "tsim_sha_tsui": "high", "kowloon": "high",
+            "hung_hom": "medium", "mong_kok": "medium",
+            "tuen_mun": "very_high", "yuen_long": "very_high", "tin_shui_wai": "very_high",
+            "sha_tin": "medium", "sai_kung": "medium",
+            "lantau": "medium", "islands": "medium",
+        }
+        return risk_levels.get(district.lower(), "medium")
+

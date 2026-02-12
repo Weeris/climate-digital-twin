@@ -6,3 +6,8 @@ matplotlib>=3.4.0
 streamlit>=1.20.0
 geopandas>=0.10.0
 shapely>=2.0.0
+
+# HK Visualization Dependencies
+folium>=2.0.0
+branca>=0.7.0
+streamlit-folium>=0.15.0

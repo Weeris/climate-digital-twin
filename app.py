@@ -600,20 +600,264 @@ def show_reports_page(currency: str):
         st.warning("Complete assessments to generate reports.")
 
 
+# ===== HK-SPECIFIC PAGES =====
+
+def show_hk_home_page():
+    """HK-specific home/dashboard page."""
+    st.markdown("""
+    <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #1E88E5 0%, #0D47A1 100%); 
+                border-radius: 10px; margin-bottom: 20px;">
+        <h1 style="color: white; margin: 0;">🇭🇰 Hong Kong Climate Digital Twin</h1>
+        <p style="color: #E3F2FD; margin: 10px 0 0 0;">Specialized Climate Risk Assessment for Hong Kong</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Key metrics
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Total Portfolio Exposure", "$4.2B HKD", "↑ 2.3%")
+    with col2:
+        st.metric("Districts at High Risk", "5", "↑ 1")
+    with col3:
+        st.metric("Properties at Risk", "12", "↓ 2")
+    with col4:
+        st.metric("Avg Risk Score", "6.8/10", "↓ 0.5")
+    
+    st.markdown("---")
+    
+    # Current conditions
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("### 🌡️ Current Weather")
+        st.info("Typhoon Signal: **3** | Temperature: **28°C** | Humidity: **82%**")
+    
+    with col2:
+        st.markdown("### ⚠️ Active Warnings")
+        st.warning("No active warnings")
+    
+    # District risk summary
+    st.markdown("### 📊 District Risk Summary")
+    districts = [
+        ("Central & Western", "High", "Flood, Storm Surge"),
+        ("Wan Chai", "High", "Flood, Typhoon"),
+        ("Eastern", "Medium", "Typhoon"),
+        ("Southern", "Medium", "Typhoon"),
+        ("Kowloon City", "High", "Flood"),
+        ("Yau Tsim Mong", "High", "Flood"),
+        ("New Territories West", "Very High", "Flood"),
+        ("New Territories East", "Medium", "General"),
+    ]
+    
+    for district, risk, hazards in districts:
+        color = {"Very High": "red", "High": "orange", "Medium": "yellow"}.get(risk, "green")
+        st.markdown(f"""
+        <div style="padding: 10px; margin: 5px 0; border-left: 4px solid {color}; background: #f5f5f5; border-radius: 5px;">
+            <strong>{district}</strong> - {risk} Risk<br>
+            <small style="color: #666;">{hazards}</small>
+        </div>
+        """, unsafe_allow_html=True)
+
+
+def show_hk_risk_map_page():
+    """HK interactive risk map page."""
+    st.markdown("## 🗺️ HK Interactive Risk Map")
+    st.markdown("Explore climate risks across Hong Kong districts")
+    
+    try:
+        from utils.hk_map import create_hk_map, list_districts, get_district
+        from streamlit_folium import st_folium
+        
+        # District selector
+        selected = st.selectbox("Select District", ["All Districts"] + list_districts())
+        
+        # Create and display map
+        m = create_hk_map()
+        st_folium(m, width=900, height=550)
+        
+        # District details
+        if selected != "All Districts":
+            district = get_district(selected)
+            if district:
+                st.markdown(f"### {district.display_name} Details")
+                risk = max(district.risk_levels.values(), key=lambda x: ["low", "medium", "high", "very_high"].index(x))
+                st.markdown(f"**Overall Risk:** {risk.upper()}")
+                for hazard, level in district.risk_levels.items():
+                    st.write(f"- {hazard.title()}: {level.upper()}")
+                st.write(f"**Population:** {district.population:,}")
+                st.write(f"**Avg Property Value:** HKD ${district.avg_property_value_hkd:,.0f}")
+    
+    except ImportError:
+        st.error("Map visualization requires folium and streamlit-folium packages")
+        st.info("Install with: pip install folium streamlit-folium")
+    except Exception as e:
+        st.warning("Map temporarily unavailable")
+
+
+def show_hk_property_page():
+    """HK property analysis page."""
+    st.markdown("## 🏠 HK Property Analysis")
+    
+    try:
+        from core.hk_property_values import HKPropertyValues
+        pv = HKPropertyValues()
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            district = st.selectbox("District", pv.get_district_list(), key="prop_district")
+        with col2:
+            building_type = st.selectbox("Building Type", pv.get_building_types_for_district(district), key="prop_type")
+        
+        col3, col4, col5 = st.columns(3)
+        with col3:
+            area = st.number_input("Area (sqft)", 200, 5000, 800, key="prop_area")
+        with col4:
+            floor = st.number_input("Floor", 1, 80, 20, key="prop_floor")
+        with col5:
+            view = st.selectbox("View", ["city", "sea", "mountain", "park", "none"], key="prop_view")
+        
+        age = st.number_input("Building Age (years)", 0, 50, 10, key="prop_age")
+        
+        if st.button("Calculate Property Value", key="prop_calc"):
+            result = pv.calculate_property_value(district, building_type, area, floor, view, age)
+            if "error" not in result:
+                st.success(f"### Estimated Value: HKD ${result['total_value_hkd']:,.0f}")
+                st.markdown(f"""
+                - Price/sqft: ${result['final_price_sqft_hkd']:,.0f}
+                - Floor Premium: {result['floor_premium_factor']:.2f}x
+                - View Premium: {result['view_premium_factor']:.2f}x
+                - Age Factor: {result['age_depreciation_factor']:.2f}x
+                """)
+            else:
+                st.error(result["error"])
+    
+    except ImportError:
+        st.error("HK Property module not available")
+
+
+def show_hk_financial_page():
+    """HK financial analysis page."""
+    st.markdown("## 💰 HK Financial Analysis")
+    
+    try:
+        from core.hk_financial import HKFinancialModel
+        from core.hk_insurance import HKInsuranceCalculator
+        
+        model = HKFinancialModel()
+        insurance = HKInsuranceCalculator()
+        
+        tab1, tab2, tab3 = st.tabs(["💵 Acquisition", "🛡️ Insurance", "📈 Mortgage"])
+        
+        with tab1:
+            st.markdown("### Property Acquisition Cost Calculator")
+            price = st.number_input("Property Price (HKD)", 5000000, 100000000, 20000000, 1000000)
+            is_hk_resident = st.checkbox("HK Resident", value=True)
+            
+            if st.button("Calculate Total Cost"):
+                result = model.calculate_total_acquisition_cost(price, is_hk_resident)
+                st.markdown(f"""
+                - Stamp Duty: ${result['stamp_duty']:,.0f}
+                - Legal Fees: ${result['legal_fees']:,.0f}
+                - Agency Fee: ${result['agency_fee']:,.0f}
+                - **Total Acquisition: ${result['total_acquisition_cost']:,.0f}**
+                """)
+        
+        with tab2:
+            st.markdown("### Insurance Premium Calculator")
+            sum_insured = st.number_input("Sum Insured (HKD)", 5000000, 100000000, 20000000, 1000000)
+            district = st.selectbox("District", ["central", "tst", "wan_chai", "hung_hom", "kwun_tong"])
+            hazards = st.multiselect("Covered Hazards", ["typhoon", "flood", "fire", "earthquake"], default=["typhoon", "flood"])
+            
+            if st.button("Calculate Premium"):
+                premium = insurance.calculate_premium(sum_insured, district, hazards)
+                st.success(f"Annual Premium: HKD ${premium['total_premium']:,.0f}")
+        
+        with tab3:
+            st.markdown("### Mortgage Affordability Checker")
+            property_value = st.number_input("Property Value (HKD)", 5000000, 100000000, 20000000, 1000000)
+            income = st.number_input("Annual Income (HKD)", 200000, 2000000, 600000, 50000)
+            ltv = st.slider("LTV Ratio", 0.5, 0.9, 0.7)
+            
+            if st.button("Check Affordability"):
+                mortgage = model.calculate_mortgage_impact(property_value, 0.1, "residential")
+                dti = mortgage["annual_payment"] / income
+                st.markdown(f"""
+                - Monthly Payment: ${mortgage['monthly_payment']:,.0f}
+                - DTI Ratio: {dti:.1%}
+                - Affordability: {"✅ OK" if dti < 0.4 else "⚠️ High"}
+                """)
+    
+    except ImportError:
+        st.error("HK Financial module not available")
+
+
+def show_sidebar():
+    """Show sidebar with navigation."""
+    st.sidebar.title("🌍 Climate Digital Twin")
+    st.sidebar.markdown("---")
+    
+    # Main navigation
+    st.sidebar.title("📁 Main Menu")
+    main_pages = [
+        ("🏠 Home", "home"),
+        ("📥 Data Input", "data"),
+        ("🌊 Hazard Assessment", "hazard"),
+        ("💰 Financial Impact", "financial"),
+        ("🎲 Monte Carlo", "monte_carlo"),
+        ("🎭 Scenario Analysis", "scenario"),
+        ("📄 Reports", "reports")
+    ]
+    
+    for name, key in main_pages:
+        st.sidebar.write(f"📄 {name}")
+    
+    st.sidebar.markdown("---")
+    
+    # HK-specific navigation
+    st.sidebar.title("🇭🇰 Hong Kong")
+    hk_pages = [
+        ("🇭🇰 HK Dashboard", "hk_home"),
+        ("🗺️ HK Risk Map", "hk_map"),
+        ("🏠 HK Property Analysis", "hk_property"),
+        ("💰 HK Financial Analysis", "hk_financial")
+    ]
+    
+    for name, key in hk_pages:
+        st.sidebar.write(f"🇭🇰 {name}")
+    
+    st.sidebar.markdown("---")
+    
+    # Currency toggle
+    st.sidebar.title("⚙️ Settings")
+    currency = st.sidebar.selectbox("Currency", ["HKD", "USD"])
+    
+    # HK Zone selector
+    hk_zone = st.sidebar.selectbox("Default HK Zone", 
+        ["central", "wan_chai", "tst", "hung_hom", "sha_tin", "tuen_mun", "yuen_long"])
+    
+    return currency
+
+
 def main():
     """Main application."""
     currency = show_sidebar()
     
     # Page navigation
     page = st.session_state.get("nav_page", "home")
+    
     pages = {
+        # Main pages
         "home": show_home_page,
         "data": show_data_input_page,
         "hazard": show_hazard_page,
         "financial": show_financial_page,
         "monte_carlo": show_monte_carlo_page,
         "scenario": show_scenario_page,
-        "reports": show_reports_page
+        "reports": show_reports_page,
+        # HK pages
+        "hk_home": show_hk_home_page,
+        "hk_map": show_hk_risk_map_page,
+        "hk_property": show_hk_property_page,
+        "hk_financial": show_hk_financial_page,
     }
     
     if page in pages:
