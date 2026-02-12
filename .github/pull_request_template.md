@@ -14,6 +14,11 @@
 - [ ] Documentation updated
 - [ ] Tests added/updated
 - [ ] All tests pass
+- [ ] License header present (see LICENSE file)
+- [ ] No parquet/temp files committed
+
+## License
+This project is licensed under the MIT License - see [LICENSE](LICENSE) for details.
 
 ## Notes
 <!-- Additional notes or comments -->
