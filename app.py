@@ -245,7 +245,7 @@ def show_data_input_page(currency: str):
                         with c2:
                             asset_type = st.selectbox(f"Type", ["residential", "commercial", "industrial"])
                         with c3:
-                            region = st.selectbox(f"Region", ["Bangkok", "Chonburi", "Ayutthaya", "Rayong"])
+                            region = st.selectbox(f"Region", ["central", "wan_chai", "tst", "kwun_tong", "causeway_bay", "sha_tin", "tuen_mun"])
                         with c4:
                             value = st.number_input(f"Value", 100000, 100000000, 10000000, 100000)
                         assets.append({"asset_id": asset_id, "asset_type": asset_type, "region": region, "value": value, "base_pd": 0.02, "base_lgd": 0.4, "damage_ratio": 0.1})
@@ -462,7 +462,7 @@ def show_monte_carlo_page(currency: str):
             st.info(f"Using portfolio with {len(portfolio)} assets")
         else:
             st.warning("Using sample portfolio")
-            portfolio = [PortfolioAsset(f"Asset_{i}", 50000000, "residential", "Bangkok", 0.5) for i in range(10)]
+            portfolio = [PortfolioAsset(f"HK_{i}", 50000000, "residential_high_rise", "central", 0.3) for i in range(10)]
         
         if st.button("Run Simulation"):
             config = SimulationConfig(n_simulations=n_simulations, time_horizon=time_horizon, confidence_level=confidence, random_seed=42)
@@ -529,7 +529,7 @@ def show_scenario_page(currency: str):
         if workflow.portfolio_data is not None:
             portfolio = [PortfolioAsset(asset_id=row["asset_id"], value=row["value"], asset_type=row["asset_type"], region=row["region"], climate_beta=0.5) for _, row in workflow.portfolio_data.iterrows()]
         else:
-            portfolio = [PortfolioAsset(f"Asset_{i}", 50000000, "residential", "Bangkok", 0.5) for i in range(10)]
+            portfolio = [PortfolioAsset(f"HK_{i}", 50000000, "residential_high_rise", "central", 0.3) for i in range(10)]
         
         if st.button("Compare Scenarios"):
             config = SimulationConfig(n_simulations=5000, time_horizon=time_horizon, random_seed=42)
