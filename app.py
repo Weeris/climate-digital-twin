@@ -616,7 +616,7 @@ def show_reports_page(currency: str):
 # ===== HK Risk Map =====
 
 
-def show_hk_risk_map_page():
+def show_hk_risk_map_page(currency: str = "HKD"):
     """HK interactive risk map page."""
     st.markdown("## 🗺️ HK Interactive Risk Map")
     st.markdown("Explore climate risks across Hong Kong districts")
@@ -626,7 +626,8 @@ def show_hk_risk_map_page():
         from streamlit_folium import st_folium
         
         # District selector
-        selected = st.selectbox("Select District", ["All Districts"] + list_districts())
+        districts = list_districts() if callable(list_districts) else ["central", "wan_chai", "tst", "kwun_tong", "causeway_bay"]
+        selected = st.selectbox("Select District", ["All Districts"] + districts)
         
         # Create and display map
         m = create_hk_map()
@@ -644,11 +645,11 @@ def show_hk_risk_map_page():
                 st.write(f"**Population:** {district.population:,}")
                 st.write(f"**Avg Property Value:** HKD ${district.avg_property_value_hkd:,.0f}")
     
-    except ImportError:
-        st.error("Map visualization requires folium and streamlit-folium packages")
-        st.info("Install with: pip install folium streamlit-folium")
+    except ImportError as e:
+        st.error(f"Map packages required: {e}")
+        st.info("Go to Settings → Dependencies to install folium and streamlit-folium")
     except Exception as e:
-        st.warning("Map temporarily unavailable")
+        st.warning(f"Map temporarily unavailable: {str(e)[:100]}")
 
 
 def main():
