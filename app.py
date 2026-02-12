@@ -109,7 +109,7 @@ def show_sidebar():
     return currency
 
 
-def show_home_page():
+def show_home_page(currency: str = "HKD"):
     """Home page with workflow overview."""
     st.markdown("""
     <div style="text-align: center; font-size: 2.5rem; font-weight: bold; color: #1E88E5; margin-bottom: 1rem;">
@@ -838,7 +838,10 @@ def main():
     }
     
     if page in main_pages:
-        main_pages[page](currency)
+        if page == "home":
+            show_home_page(currency)
+        else:
+            main_pages[page](currency)
     elif page in hk_pages:
         hk_pages[page]()
     else:
