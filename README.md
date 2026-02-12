@@ -512,17 +512,21 @@ pip install -r requirements.txt
 
 ### Usage
 
-1. Run main dashboard:
-```bash
-streamlit run app.py
-```
-
-2. Navigate to HK-specific pages via sidebar
-
-3. Run HK demo:
+#### Option 1: Quick HK Demo (Recommended for first-time users)
 ```bash
 streamlit run demo_hk.py
 ```
+- Simplified HK-only interface with tabs
+- Quick overview, property calc, damage assessment, map
+- No workflow dependencies
+
+#### Option 2: Full Dashboard
+```bash
+streamlit run app.py
+```
+- Complete workflow (Data → Hazard → Financial → Monte Carlo)
+- Full sidebar navigation with workflow state tracking
+- 11 total pages including HK-specific pages
 
 ### HK District Coordinates
 
