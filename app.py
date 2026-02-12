@@ -248,13 +248,13 @@ def show_data_input_page(currency: str):
             m3.metric("Avg PD", f"{portfolio['base_pd'].mean():.2%}")
             m4.metric("Avg LGD", f"{portfolio['base_lgd'].mean():.0%}")
             
-            region_summary = portfolio.groupby("region")["value"].sum()
+            region_summary = portfolio.groupby("district")["value"].sum()
             st.bar_chart(region_summary)
     
     with tab2:
-        st.markdown("#### Regional Hazard Data")
+        st.markdown("#### HK Regional Hazard Data")
         region_data = RegionalHazardData()
-        selected_region = st.selectbox("Select Region", ["bangkok_central", "bangkok_peripheral", "ayutthaya_industrial"])
+        selected_region = st.selectbox("Select Region", ["central", "wan_chai", "tst", "kwun_tong", "causeway_bay", "sha_tin", "tuen_mun"])
         
         if st.button("Load Regional Data"):
             hazard_params = region_data.get_regional_hazard_params(region=selected_region, hazard_type="flood", return_period=100)
