@@ -100,7 +100,7 @@ def show_sidebar():
     
     st.sidebar.markdown("---")
     st.sidebar.title("Settings")
-    currency = st.sidebar.selectbox("Currency", ["USD", "THB", "EUR", "GBP", "HKD"], index=3)
+    currency = st.sidebar.selectbox("Currency", ["USD", "THB", "EUR", "GBP", "HKD"], index=4)
     
     if st.sidebar.button("🔄 Reset"):
         st.session_state.workflow = WorkflowState()
@@ -123,25 +123,26 @@ def show_home_page():
     </div>
     """, unsafe_allow_html=True)
     
-    # Workflow steps
-    st.markdown("### Workflow Overview")
+    # Infographic - Workflow Overview
+    st.markdown("### How It Works")
     
     col1, col2, col3, col4 = st.columns(4)
     
     steps = [
-        ("📥", "Data Input", "Upload portfolio and hazard data"),
-        ("🌊", "Hazard", "Analyze physical damage"),
-        ("💰", "Financial", "Calculate credit risk impact"),
-        ("🎭", "Scenarios", "Run scenario simulations"),
+        ("1", "Upload", "Portfolio & Hazard Data", "📁", "#667eea"),
+        ("2", "Analyze", "Flood & Typhoon Risk", "🌊", "#e74c3c"),
+        ("3", "Calculate", "Financial Impact", "💰", "#27ae60"),
+        ("4", "Report", "Risk Metrics", "📈", "#8e44ad"),
     ]
     
-    for col, (icon, title, desc) in zip([col1, col2, col3, col4], steps):
+    for col, (num, title, desc, icon, color) in zip([col1, col2, col3, col4], steps):
         with col:
             st.markdown(f"""
-            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1rem; border-radius: 10px; text-align: center;">
-                <div style="font-size: 2rem;">{icon}</div>
-                <strong>{title}</strong>
-                <div style="font-size: 0.8rem; margin-top: 0.5rem;">{desc}</div>
+            <div style="background: linear-gradient(135deg, {color} 0%, {color}dd 100%); color: white; 
+                        padding: 1.5rem; border-radius: 12px; text-align: center;">
+                <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">{icon}</div>
+                <strong style="font-size: 1.2rem;">{title}</strong>
+                <div style="font-size: 0.85rem; margin-top: 0.5rem; opacity: 0.9;">{desc}</div>
             </div>
             """, unsafe_allow_html=True)
     
@@ -173,13 +174,15 @@ def show_home_page():
     
     if st.button("Run Demo"):
         sample_portfolio = pd.DataFrame({
-            "asset_id": ["RE001", "RE002", "RE003", "RE004", "RE005"],
-            "asset_type": ["residential", "residential", "commercial", "industrial", "commercial"],
-            "region": ["Bangkok", "Bangkok", "Chonburi", "Ayutthaya", "Rayong"],
+            "asset_id": ["HK001", "HK002", "HK003", "HK004", "HK005"],
+            "asset_type": ["residential_high_rise", "residential_high_rise", "commercial_office", "industrial_warehouse", "commercial_retail"],
+            "district": ["central", "wan_chai", "tst", "kwun_tong", "causeway_bay"],
             "value": [50000000, 30000000, 80000000, 120000000, 60000000],
-            "base_pd": [0.02, 0.015, 0.03, 0.04, 0.025],
-            "base_lgd": [0.4, 0.4, 0.45, 0.5, 0.4],
-            "damage_ratio": [0.15, 0.10, 0.20, 0.35, 0.18]
+            "base_pd": [0.015, 0.018, 0.025, 0.035, 0.02],
+            "base_lgd": [0.35, 0.38, 0.42, 0.45, 0.4],
+            "damage_ratio": [0.12, 0.15, 0.18, 0.28, 0.14],
+            "floor": [35, 22, 45, 8, 12],
+            "building_age": [8, 15, 5, 20, 25]
         })
         
         hazard = HazardAssessment()
@@ -815,8 +818,8 @@ def main():
         st.session_state.nav_page = "home"
     page = st.session_state.nav_page
     
-    pages = {
-        # Main pages
+    # Pages that need currency parameter
+    main_pages = {
         "home": show_home_page,
         "data": show_data_input_page,
         "hazard": show_hazard_page,
@@ -824,15 +827,20 @@ def main():
         "monte_carlo": show_monte_carlo_page,
         "scenario": show_scenario_page,
         "reports": show_reports_page,
-        # HK pages
+    }
+    
+    # HK pages (use HKD internally)
+    hk_pages = {
         "hk_home": show_hk_home_page,
         "hk_map": show_hk_risk_map_page,
         "hk_property": show_hk_property_page,
         "hk_financial": show_hk_financial_page,
     }
     
-    if page in pages:
-        pages[page](currency)
+    if page in main_pages:
+        main_pages[page](currency)
+    elif page in hk_pages:
+        hk_pages[page]()
     else:
         show_home_page()
 
