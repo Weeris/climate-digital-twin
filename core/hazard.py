@@ -8,10 +8,33 @@ Provides physical climate risk assessment for:
 - Drought
 
 Uses hazard-vulnerability-exposure framework for damage estimation.
+Integrates CLIMADA's ImpactFunc pattern for standardized impact functions.
 """
 
-from typing import Dict, Callable, Tuple
+from typing import Dict, Callable, Tuple, Optional
 import math
+import numpy as np
+
+# Import CLIMADA-compatible classes
+try:
+    from core.hazard_climada import (
+        ClimadaImpactFunc,
+        HKClimadaImpactFunc,
+        ImpactFuncSet,
+        HK_TC_WindDamage,
+        HK_FloodDamage,
+        HK_FireDamage,
+        HK_DroughtDamage,
+        create_default_funcset,
+        HazardType
+    )
+    CLIMADA_AVAILABLE = True
+except ImportError:
+    CLIMADA_AVAILABLE = False
+    # Define placeholder classes if import fails
+    ClimadaImpactFunc = None
+    HKClimadaImpactFunc = None
+    ImpactFuncSet = None
 
 
 class HazardAssessment:
@@ -22,9 +45,18 @@ class HazardAssessment:
     with focus on real estate portfolio impact.
     """
     
-    def __init__(self):
-        """Initialize hazard assessment module."""
+    def __init__(self, use_climada: bool = False):
+        """Initialize hazard assessment module.
+        
+        Args:
+            use_climada: Whether to use CLIMADA-compatible functions by default
+        """
         self.damage_functions = self._initialize_damage_functions()
+        self._climada_functions = ImpactFuncSet() if CLIMADA_AVAILABLE and use_climada else None
+        
+        # Initialize CLIMADA functions if available and requested
+        if use_climada and CLIMADA_AVAILABLE:
+            self._load_climada_functions()
     
     def _initialize_damage_functions(self) -> Dict[str, Callable]:
         """Initialize damage functions for each hazard type."""
@@ -369,6 +401,107 @@ class HazardAssessment:
         asset_factor = asset_factor_map.get(asset_type, 1.0)
         
         return int(base * intensity_factor * asset_factor)
+    
+    # =====================
+    # CLIMADA COMPATIBILITY METHODS
+    # =====================
+    
+    def _load_climada_functions(self) -> None:
+        """Load CLIMADA-compatible impact functions."""
+        if not CLIMADA_AVAILABLE or self._climada_functions is None:
+            return
+        
+        # Load HK-specific functions
+        self._climada_functions = create_default_funcset()
+    
+    def assess_hazard_climada(
+        self,
+        haz_type: str,
+        func_id: int,
+        intensity: float,
+        asset_value: float,
+        zone: str = "default"
+    ) -> Dict:
+        """
+        Assess hazard using CLIMADA-compatible impact function.
+        
+        Args:
+            haz_type: Hazard type code (TC, FL, WF, DR)
+            func_id: Function identifier
+            intensity: Hazard intensity value
+            asset_value: Value of the asset
+            zone: HK zone identifier (for HK functions)
+            
+        Returns:
+            Dictionary with damage assessment results
+        """
+        if not CLIMADA_AVAILABLE or self._climada_functions is None:
+            raise RuntimeError("CLIMADA functions not available. Set use_climada=True in __init__.")
+        
+        func = self._climada_functions.get_func(haz_type, func_id)
+        if func is None:
+            raise ValueError(f"Impact function not found: {haz_type} #{func_id}")
+        
+        # Calculate damage
+        if isinstance(func, HKClimadaImpactFunc):
+            mdr = func.calc_mdr(intensity, zone)
+            damage = func.calc_impact(intensity, asset_value, zone)
+        else:
+            mdr = func.calc_mdr(intensity)
+            damage = func.calc_impact(intensity, asset_value)
+        
+        is_valid, issues = func.validate()
+        
+        return {
+            "hazard_type": haz_type,
+            "intensity": intensity,
+            "func_id": func_id,
+            "damage_ratio": mdr,
+            "physical_damage": damage,
+            "residual_value": asset_value - damage,
+            "asset_value": asset_value,
+            "function_name": func.name,
+            "valid": is_valid,
+            "validation_issues": issues,
+            "zone": zone if isinstance(func, HKClimadaImpactFunc) else None
+        }
+    
+    def get_climada_func(self, haz_type: str, func_id: int) -> Optional['ClimadaImpactFunc']:
+        """
+        Get a CLIMADA-compatible impact function.
+        
+        Args:
+            haz_type: Hazard type code
+            func_id: Function identifier
+            
+        Returns:
+            ClimadaImpactFunc or None
+        """
+        if not CLIMADA_AVAILABLE or self._climada_functions is None:
+            return None
+        return self._climada_functions.get_func(haz_type, func_id)
+    
+    def list_climada_functions(self, haz_type: str = None) -> Dict:
+        """
+        List available CLIMADA impact functions.
+        
+        Args:
+            haz_type: Optional hazard type filter
+            
+        Returns:
+            Dictionary of available functions
+        """
+        if not CLIMADA_AVAILABLE or self._climada_functions is None:
+            return {}
+        
+        if haz_type:
+            funcs = self._climada_functions.get_funcs_by_type(haz_type)
+            return {f.func_id: f.name for f in funcs}
+        else:
+            result = {}
+            for ht, funcs in self._climada_functions.functions.items():
+                result[ht] = {fid: f.name for fid, f in funcs.items()}
+            return result
 
 
 class RegionalHazardData:
@@ -787,4 +920,183 @@ class HKHazardAssessment:
             "lantau": "medium", "islands": "medium",
         }
         return risk_levels.get(district.lower(), "medium")
+
+
+# =====================
+# CLIMADA WRAPPER FUNCTIONS
+# =====================
+
+def create_climada_flood_func(
+    depth_m_array: list,
+    mdd_array: list,
+    paa_array: list,
+    name: str = "Custom Flood",
+    func_id: int = 1
+) -> Optional['ClimadaImpactFunc']:
+    """
+    Create a CLIMADA-compatible flood impact function.
+    
+    Args:
+        depth_m_array: Array of flood depth values in meters
+        mdd_array: Array of Mean Damage Degree values
+        paa_array: Array of Partial Affected Area values
+        name: Function name
+        func_id: Function identifier
+        
+    Returns:
+        ClimadaImpactFunc or None if CLIMADA not available
+    """
+    if not CLIMADA_AVAILABLE:
+        return None
+    
+    return ClimadaImpactFunc(
+        haz_type="FL",
+        func_id=func_id,
+        name=name,
+        intensity_unit="m",
+        intensity=np.array(depth_m_array),
+        mdd=np.array(mdd_array),
+        paa=np.array(paa_array)
+    )
+
+
+def create_hk_climada_assessment(
+    building_type: str = "residential_high_rise",
+    zone: str = "default"
+) -> Optional[ImpactFuncSet]:
+    """
+    Create a CLIMADA impact function set for HK buildings.
+    
+    Args:
+        building_type: Type of HK building
+        zone: HK zone identifier for adjustments
+        
+    Returns:
+        ImpactFuncSet with HK functions or None
+    """
+    if not CLIMADA_AVAILABLE:
+        return None
+    
+    funcset = ImpactFuncSet()
+    
+    # Add standard HK functions
+    funcset.add_func(HK_TC_WindDamage(building_type=building_type))
+    funcset.add_func(HK_FloodDamage(building_type=building_type))
+    funcset.add_func(HK_FireDamage(building_type=building_type))
+    funcset.add_func(HK_DroughtDamage(building_type=building_type))
+    
+    return funcset
+
+
+def assess_flood_damage_climada(
+    flood_depth_m: float,
+    asset_value_hkd: float,
+    building_type: str = "residential_high_rise",
+    zone: str = "default"
+) -> Optional[Dict]:
+    """
+    Assess flood damage using CLIMADA-compatible function.
+    
+    Backward-compatible wrapper that creates a CLIMADA function
+    and returns damage assessment.
+    
+    Args:
+        flood_depth_m: Flood depth in meters
+        asset_value_hkd: Asset value in HKD
+        building_type: Type of building
+        zone: HK zone identifier
+        
+    Returns:
+        Dictionary with damage assessment or None if CLIMADA unavailable
+    """
+    if not CLIMADA_AVAILABLE:
+        return None
+    
+    func = HK_FloodDamage(building_type=building_type)
+    mdr = func.calc_mdr(flood_depth_m, zone)
+    damage = func.calc_impact(flood_depth_m, asset_value_hkd, zone)
+    
+    return {
+        "hazard_type": "flood",
+        "depth_m": flood_depth_m,
+        "damage_ratio": mdr,
+        "physical_damage_hkd": damage,
+        "residual_value_hkd": asset_value_hkd - damage,
+        "zone": zone,
+        "building_type": building_type,
+        "function": func.name
+    }
+
+
+def assess_typhoon_damage_climada(
+    wind_speed_kmh: float,
+    asset_value_hkd: float,
+    building_type: str = "residential_high_rise",
+    construction: str = "reinforced_concrete",
+    zone: str = "default"
+) -> Optional[Dict]:
+    """
+    Assess typhoon damage using CLIMADA-compatible function.
+    
+    Args:
+        wind_speed_kmh: Wind speed in km/h
+        asset_value_hkd: Asset value in HKD
+        building_type: Type of building
+        construction: Construction type
+        zone: HK zone identifier
+        
+    Returns:
+        Dictionary with damage assessment
+    """
+    if not CLIMADA_AVAILABLE:
+        return None
+    
+    func = HK_TC_WindDamage(building_type=building_type, construction=construction)
+    mdr = func.calc_mdr(wind_speed_kmh, zone)
+    damage = func.calc_impact(wind_speed_kmh, asset_value_hkd, zone)
+    
+    # Signal equivalent
+    if wind_speed_kmh < 41:
+        signal = "Signal 1"
+    elif wind_speed_kmh < 63:
+        signal = "Signal 3"
+    elif wind_speed_kmh < 118:
+        signal = "Signal 8"
+    elif wind_speed_kmh < 150:
+        signal = "Signal 9"
+    else:
+        signal = "Signal 10"
+    
+    return {
+        "hazard_type": "typhoon",
+        "wind_speed_kmh": wind_speed_kmh,
+        "signal_equivalent": signal,
+        "damage_ratio": mdr,
+        "physical_damage_hkd": damage,
+        "residual_value_hkd": asset_value_hkd - damage,
+        "zone": zone,
+        "building_type": building_type,
+        "construction": construction,
+        "function": func.name
+    }
+
+
+def create_climada_impact_set() -> Optional[ImpactFuncSet]:
+    """
+    Create a default CLIMADA impact function set with all HK functions.
+    
+    Returns:
+        ImpactFuncSet with all functions or None
+    """
+    if not CLIMADA_AVAILABLE:
+        return None
+    
+    return create_default_funcset()
+
+
+# Backward compatibility aliases
+TCWindDamageCLIMADA = HK_TC_WindDamage
+FloodDamageCLIMADA = HK_FloodDamage
+FireDamageCLIMADA = HK_FireDamage
+DroughtDamageCLIMADA = HK_DroughtDamage
 
