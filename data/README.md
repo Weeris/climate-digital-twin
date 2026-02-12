@@ -1,34 +1,39 @@
 # Data Directory
 
-This directory contains sample data and data documentation for the Climate Digital Twin project.
+This directory contains Hong Kong climate and financial data for the Climate Digital Twin project.
 
-## Sample Data Files
+## Data Files
 
-### Portfolio Data
-Format for portfolio CSV files:
+### hk_districts.json
+HK district risk data for the interactive map:
+- 12 districts: central, wan_chai, causeway_bay, tst, hung_hom, kwun_tong, sha_tin, tuen_mun, yuen_long, tin_shui_wai, lantau, cheung_chau
+- Risk levels: flood, typhoon, wildfire, drought
+- Coordinates, population, property values
+
+### hk_financial_params.json
+HK-specific financial parameters:
+- Currency: HKD (7.75 per USD)
+- Property taxes: BSD, AVD, stamp duty
+- Mortgage parameters: prime rate 5.875%
+- Insurance rates by district
+
+## Sample Portfolio Format
+
+HK sample portfolio (in app.py):
 ```
-asset_id,value,asset_type,region,base_pd,base_lgd,damage_ratio
-A001,50000000,residential,Bangkok,0.02,0.4,0.15
-A002,30000000,residential,Bangkok,0.015,0.4,0.10
+asset_id,asset_type,district,value,base_pd,base_lgd,damage_ratio,floor,building_age
+HK001,residential_high_rise,central,50000000,0.015,0.35,0.12,35,8
+HK002,residential_high_rise,wan_chai,30000000,0.018,0.38,0.15,22,15
 ...
-```
-
-### Regional Hazard Data
-Regional flood parameters (flood depth in meters by return period):
-```
-region,risk_level,10yr_depth,100yr_depth,500yr_depth
-bangkok_central,high,0.3,1.2,2.0
-bangkok_peripheral,medium,0.2,0.8,1.5
-ayutthaya_industrial,very_high,0.8,2.5,3.5
 ```
 
 ## External Data Sources
 
-Climate and hazard data should be sourced from:
+Climate and hazard data sourced from:
+- **Hong Kong Observatory**: Local weather and typhoon data
 - **NASA Earth Data**: Satellite imagery and climate observations
 - **Copernicus EMS**: European Emergency Management Service
 - **World Bank Climate Data**: Open climate datasets
-- **Local meteorological agencies**: Country-specific hazard data
 
 ## Data Processing
 
