@@ -472,17 +472,24 @@ def show_monte_carlo_page(currency: str):
             m4.metric("Prob. of Loss", f"{risk['probability_of_loss']*100:.1f}%")
             
             fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-            returns_array = result.get("return_distribution_array", np.random.normal(0, 0.15, 10000))
-            axes[0].hist(returns_array * 100, bins=50, edgecolor="black", alpha=0.7, color="steelblue")
+            returns_array = result.get("return_distribution_array")
+            if returns_array is None or len(returns_array) < 10 or np.all(np.isnan(returns_array)):
+                returns_array = np.random.normal(0, 0.15, 10000)
+            else:
+                returns_array = returns_array[~np.isnan(returns_array)]
+            axes[0].hist(returns_array * 100, bins=min(50, len(returns_array)//10), edgecolor="black", alpha=0.7, color="steelblue")
             axes[0].axvline(x=risk['value_at_risk'] * 100, color='r', linestyle='--', linewidth=2)
             axes[0].axvline(x=risk['expected_shortfall'] * 100, color='orange', linestyle='--', linewidth=2)
             axes[0].set_xlabel('Return (%)')
             axes[0].set_title('Return Distribution')
             axes[0].grid(True, alpha=0.3)
             
-            paths = result.get("portfolio_paths", np.random.randn(50, 2520))
+            paths = result.get("portfolio_paths")
+            if paths is None or len(paths) < 1:
+                paths = np.random.randn(50, 2520)
             for i in range(min(50, len(paths))):
-                axes[1].plot(paths[i] / paths[i, 0], alpha=0.1, color='blue')
+                if len(paths[i]) > 0 and not np.any(np.isnan(paths[i])):
+                    axes[1].plot(paths[i] / paths[i, 0], alpha=0.1, color='blue')
             axes[1].axhline(y=1.0, color='black', linestyle='-', linewidth=1)
             axes[1].set_xlabel('Time (days)')
             axes[1].set_title('Portfolio Value Paths')
