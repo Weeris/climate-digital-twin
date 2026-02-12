@@ -28,6 +28,7 @@ from core.financial import ClimateVasicek, PortfolioRiskCalculator
 from core.simulation import MonteCarloEngine, PortfolioAsset, SimulationConfig
 from core.scenarios import ScenarioFramework
 from utils.data_processing import DataProcessor
+from utils.climate_api import get_weather_sync, get_climate_risk_sync
 
 
 # Page configuration
@@ -198,7 +199,7 @@ def show_data_input_page(currency: str):
     
     workflow = get_workflow_state()
     
-    tab1, tab2 = st.tabs(["📊 Portfolio Data", "🗺️ Regional Hazard Data"])
+    tab1, tab2, tab3 = st.tabs(["📊 Portfolio Data", "🗺️ Regional Hazard Data", "🌤️ Real-time Weather"])
     
     with tab1:
         input_method = st.radio("Choose input method", ["Use Sample Portfolio", "Upload CSV", "Manual Entry"])
@@ -265,6 +266,60 @@ def show_data_input_page(currency: str):
         if st.button("Load Regional Data"):
             hazard_params = region_data.get_regional_hazard_params(region=selected_region, hazard_type="flood", return_period=100)
             st.json(hazard_params)
+
+    with tab3:
+        st.markdown("#### 🌤️ Real-time Weather API")
+        st.markdown("Fetch current weather and climate risk from Open-Meteo (free, no API key)")
+        
+        col_a, col_b = st.columns([1, 2])
+        
+        with col_a:
+            hk_locations = ["Hong Kong", "Central", "Wan Chai", "TST", "Kwun Tong", "Sha Tin", "Tuen Mun"]
+            selected_loc = st.selectbox("Select Location", hk_locations)
+            
+            if st.button("🔄 Fetch Current Weather", use_container_width=True):
+                with st.spinner("Fetching weather data..."):
+                    weather = get_weather_sync(selected_loc)
+                    climate_risk = get_climate_risk_sync(selected_loc)
+                    
+                    if weather:
+                        st.session_state['current_weather'] = weather
+                        st.session_state['climate_risk'] = climate_risk
+                        st.success(f"✓ Updated: {weather.timestamp.strftime('%H:%M %Z')}")
+                    else:
+                        st.error("Failed to fetch weather data")
+        
+        with col_b:
+            if 'current_weather' in st.session_state:
+                w = st.session_state['current_weather']
+                r = st.session_state.get('climate_risk')
+                
+                # Weather display
+                st.markdown(f"#### 📍 {w.location}")
+                w1, w2, w3, w4 = st.columns(4)
+                w1.metric("🌡️ Temperature", f"{w.temperature_c:.1f}°C")
+                w2.metric("💧 Humidity", f"{w.humidity_percent:.0f}%")
+                w3.metric("💨 Wind", f"{w.wind_speed_kmh:.0f} km/h {w.wind_direction}")
+                w4.metric("🌧️ Precipitation", f"{w.precipitation_mm:.1f} mm")
+                
+                # Climate risk assessment
+                if r:
+                    st.markdown("#### ⚠️ Climate Risk Assessment")
+                    c1, c2, c3, c4 = st.columns(4)
+                    c1.metric("🌊 Flood Risk", r.flood_risk)
+                    c2.metric("🏜️ Drought Index", f"{r.drought_index:.2f}")
+                    c3.metric("🔥 Heat Stress", r.heat_stress_level)
+                    c4.metric("🌀 TC Risk", r.tropical_cyclone_risk)
+                    
+                    # Use in hazard assessment
+                    if st.button("📊 Use for Hazard Assessment"):
+                        st.session_state['api_weather'] = w
+                        st.session_state['api_climate_risk'] = r
+                        st.info("Weather data saved for Hazard Assessment page")
+            else:
+                st.info("Click 'Fetch Current Weather' to get real-time data")
+
+
 
 
 def show_hazard_page(currency: str):
