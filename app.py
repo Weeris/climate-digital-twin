@@ -79,14 +79,30 @@ def show_sidebar():
     }
     
     for name, key in steps:
-        status = "✅" if step_status.get(key, True) else "○"
-        st.sidebar.write(f"{status} {name}")
+        if st.sidebar.button(f"{name}", key=f"nav_{key}"):
+            st.session_state.nav_page = key
+            st.rerun()
+    
+    st.sidebar.markdown("---")
+    
+    # HK pages
+    st.sidebar.title("🇭🇰 Hong Kong")
+    hk_pages = [
+        ("🇭🇰 HK Dashboard", "hk_home"),
+        ("🗺️ HK Risk Map", "hk_map"),
+        ("🏠 HK Property", "hk_property"),
+        ("💰 HK Financial", "hk_financial")
+    ]
+    for name, key in hk_pages:
+        if st.sidebar.button(name, key=f"nav_{key}"):
+            st.session_state.nav_page = key
+            st.rerun()
     
     st.sidebar.markdown("---")
     st.sidebar.title("Settings")
-    currency = st.sidebar.selectbox("Currency", ["USD", "THB", "EUR", "GBP"])
+    currency = st.sidebar.selectbox("Currency", ["USD", "THB", "EUR", "GBP", "HKD"], index=3)
     
-    if st.sidebar.button("🔄 Reset Workflow"):
+    if st.sidebar.button("🔄 Reset"):
         st.session_state.workflow = WorkflowState()
         st.rerun()
     
@@ -790,59 +806,14 @@ def show_hk_financial_page():
         st.error("HK Financial module not available")
 
 
-def show_sidebar():
-    """Show sidebar with navigation."""
-    st.sidebar.title("🌍 Climate Digital Twin")
-    st.sidebar.markdown("---")
-    
-    # Main navigation
-    st.sidebar.title("📁 Main Menu")
-    main_pages = [
-        ("🏠 Home", "home"),
-        ("📥 Data Input", "data"),
-        ("🌊 Hazard Assessment", "hazard"),
-        ("💰 Financial Impact", "financial"),
-        ("🎲 Monte Carlo", "monte_carlo"),
-        ("🎭 Scenario Analysis", "scenario"),
-        ("📄 Reports", "reports")
-    ]
-    
-    for name, key in main_pages:
-        st.sidebar.write(f"📄 {name}")
-    
-    st.sidebar.markdown("---")
-    
-    # HK-specific navigation
-    st.sidebar.title("🇭🇰 Hong Kong")
-    hk_pages = [
-        ("🇭🇰 HK Dashboard", "hk_home"),
-        ("🗺️ HK Risk Map", "hk_map"),
-        ("🏠 HK Property Analysis", "hk_property"),
-        ("💰 HK Financial Analysis", "hk_financial")
-    ]
-    
-    for name, key in hk_pages:
-        st.sidebar.write(f"🇭🇰 {name}")
-    
-    st.sidebar.markdown("---")
-    
-    # Currency toggle
-    st.sidebar.title("⚙️ Settings")
-    currency = st.sidebar.selectbox("Currency", ["HKD", "USD"])
-    
-    # HK Zone selector
-    hk_zone = st.sidebar.selectbox("Default HK Zone", 
-        ["central", "wan_chai", "tst", "hung_hom", "sha_tin", "tuen_mun", "yuen_long"])
-    
-    return currency
-
-
 def main():
     """Main application."""
     currency = show_sidebar()
     
     # Page navigation
-    page = st.session_state.get("nav_page", "home")
+    if "nav_page" not in st.session_state:
+        st.session_state.nav_page = "home"
+    page = st.session_state.nav_page
     
     pages = {
         # Main pages
@@ -861,7 +832,7 @@ def main():
     }
     
     if page in pages:
-        pages[page]()
+        pages[page](currency)
     else:
         show_home_page()
 
