@@ -20,6 +20,10 @@ from dataclasses import dataclass
 
 # Import core modules
 from core.hazard import HazardAssessment, RegionalHazardData
+from core.hazard_climada import (
+    HK_FloodDamage, HK_TC_WindDamage, HK_FireDamage, HK_DroughtDamage,
+    ImpactFuncSet, HazardType
+)
 from core.financial import ClimateVasicek, PortfolioRiskCalculator
 from core.simulation import MonteCarloEngine, PortfolioAsset, SimulationConfig
 from core.scenarios import ScenarioFramework
@@ -300,49 +304,132 @@ def show_hazard_page(currency: str):
         
         if st.button("Calculate Damage"):
             hazard = HazardAssessment()
+            
+            # Use CLIMADA functions if available
+            climada_used = False
+            climada_result = None
+            
+            # Create CLIMADA function set
+            funcset = ImpactFuncSet()
+            
+            if hazard_type == "flood":
+                climada_func = HK_FloodDamage()
+                funcset.add_func(climada_func)
+                climada_damage = climada_func.calc_impact(intensity, asset_value)
+                climada_mdr = climada_func.calc_mdr(intensity)
+                climada_used = True
+            elif hazard_type == "cyclone":
+                climada_func = HK_TC_WindDamage()
+                funcset.add_func(climada_func)
+                climada_damage = climada_func.calc_impact(intensity, asset_value)
+                climada_mdr = climada_func.calc_mdr(intensity)
+                climada_used = True
+            elif hazard_type == "wildfire":
+                climada_func = HK_FireDamage()
+                funcset.add_func(climada_func)
+                climada_damage = climada_func.calc_impact(intensity, asset_value)
+                climada_mdr = climada_func.calc_mdr(intensity)
+                climada_used = True
+            elif hazard_type == "drought":
+                climada_func = HK_DroughtDamage()
+                funcset.add_func(climada_func)
+                climada_damage = climada_func.calc_impact(intensity, asset_value)
+                climada_mdr = climada_func.calc_mdr(intensity)
+                climada_used = True
+            
+            # Fallback to basic hazard assessment
             if hazard_type == "flood":
                 result = hazard.assess_flood_risk(depth_m=intensity, asset_value=asset_value, asset_type=asset_type, duration_hours=duration)
             else:
                 result = hazard.assess_hazard(hazard_type=hazard_type, intensity=intensity, asset_value=asset_value, asset_type=asset_type)
             
+            # Merge CLIMADA results
+            if climada_used:
+                result['climada_damage'] = climada_damage
+                result['climada_mdr'] = climada_mdr
+                result['climada_used'] = True
+                result['intensity_unit'] = climada_func.intensity_unit
+            
             workflow.hazard_result = result
-            st.success("Damage assessment complete!")
+            st.success("✓ Damage assessment complete!" + (" (CLIMADA)" if climada_used else ""))
     
     with col2:
         if workflow.hazard_result is not None:
             result = workflow.hazard_result
             
+            # Show CLIMADA metrics if available
+            if result.get('climada_used'):
+                st.markdown("#### 🌤️ CLIMADA Impact Function Results")
+                c1, c2, c3, c4 = st.columns(4)
+                c1.metric("CLIMADA MDR", f"{result.get('climada_mdr', 0)*100:.1f}%")
+                c2.metric("CLIMADA Damage", f"{result.get('climada_damage', 0):,.0f} {currency}")
+                c3.metric("Intensity Unit", result.get('intensity_unit', '-'))
+                c4.markdown("**🔬 Method:** CLIMADA ImpactFunc")
+                st.divider()
+            
+            # Standard metrics
             m1, m2, m3, m4 = st.columns(4)
             m1.metric("Damage Ratio", f"{result['damage_ratio']*100:.1f}%")
             m2.metric("Physical Damage", f"{result['physical_damage']:,.0f} {currency}")
             m3.metric("Residual Value", f"{result['residual_value']:,.0f} {currency}")
             m4.metric("Downtime", f"{result.get('downtime_days', 'N/A')} days")
             
-            # Damage curve
-            fig, ax = plt.subplots(figsize=(10, 4))
+            # Damage curve - show CLIMADA if available
+            fig, ax = plt.subplots(figsize=(10, 5))
             hazard = HazardAssessment()
             
-            if hazard_type == "flood":
-                depths = np.linspace(0, 4, 100)
-                damages = [hazard._flood_damage_curve(d, asset_type) for d in depths]
-                ax.plot(depths, damages, 'b-', linewidth=2)
-                ax.axvline(x=intensity, color='r', linestyle='--', linewidth=2, label=f'Current: {intensity}m')
-                ax.fill_between(depths, damages, alpha=0.3, color='blue')
-                ax.set_xlabel('Flood Depth (meters)')
-            elif hazard_type == "cyclone":
-                speeds = np.linspace(50, 300, 100)
-                damages = [hazard._cyclone_damage_curve(s, asset_type) for s in speeds]
-                ax.plot(speeds, damages, 'r-', linewidth=2)
-                ax.axvline(x=intensity, color='b', linestyle='--', linewidth=2, label=f'Current: {intensity} km/h')
-                ax.set_xlabel('Wind Speed (km/h)')
+            if result.get('climada_used'):
+                # Use CLIMADA function for curve
+                if hazard_type == "flood":
+                    climada_func = HK_FloodDamage()
+                    intensities = np.linspace(0, 4, 100)
+                    ax.plot(intensities, [climada_func.calc_mdr(i) for i in intensities], 
+                            'b-', linewidth=2.5, label='CLIMADA MDR', alpha=0.8)
+                    ax.axvline(x=intensity, color='r', linestyle='--', linewidth=2, label=f'Current: {intensity}m')
+                    ax.set_xlabel('Flood Depth (meters)')
+                elif hazard_type == "cyclone":
+                    climada_func = HK_TC_WindDamage()
+                    intensities = np.linspace(50, 300, 100)
+                    ax.plot(intensities, [climada_func.calc_mdr(i) for i in intensities], 
+                            'purple', linewidth=2.5, label='CLIMADA MDR', alpha=0.8)
+                    ax.axvline(x=intensity, color='orange', linestyle='--', linewidth=2, label=f'Current: {intensity} km/h')
+                    ax.set_xlabel('Wind Speed (km/h)')
+                elif hazard_type == "wildfire":
+                    climada_func = HK_FireDamage()
+                    intensities = np.linspace(0, 100, 100)
+                    ax.plot(intensities, [climada_func.calc_mdr(i) for i in intensities], 
+                            'red', linewidth=2.5, label='CLIMADA MDR', alpha=0.8)
+                    ax.axvline(x=intensity, color='orange', linestyle='--', linewidth=2, label=f'Current: {intensity}%')
+                    ax.set_xlabel('Burn Area (%)')
+                else:
+                    climada_func = HK_DroughtDamage()
+                    intensities = np.linspace(-3, 0, 100)
+                    ax.plot(intensities, [climada_func.calc_mdr(i) for i in intensities], 
+                            'brown', linewidth=2.5, label='CLIMADA MDR', alpha=0.8)
+                    ax.axvline(x=intensity, color='blue', linestyle='--', linewidth=2, label=f'Current: {intensity}')
+                    ax.set_xlabel('SPI Index')
             else:
-                ax.plot([0, intensity], [0, 1], 'orange', linewidth=2)
-                ax.axvline(x=intensity, color='blue', linestyle='--', linewidth=2)
-                ax.set_xlabel('Hazard Intensity')
+                # Fallback to basic curves
+                if hazard_type == "flood":
+                    depths = np.linspace(0, 4, 100)
+                    damages = [hazard._flood_damage_curve(d, asset_type) for d in depths]
+                    ax.plot(depths, damages, 'b-', linewidth=2)
+                    ax.axvline(x=intensity, color='r', linestyle='--', linewidth=2, label=f'Current: {intensity}m')
+                    ax.set_xlabel('Flood Depth (meters)')
+                elif hazard_type == "cyclone":
+                    speeds = np.linspace(50, 300, 100)
+                    damages = [hazard._cyclone_damage_curve(s, asset_type) for s in speeds]
+                    ax.plot(speeds, damages, 'r-', linewidth=2)
+                    ax.axvline(x=intensity, color='b', linestyle='--', linewidth=2, label=f'Current: {intensity} km/h')
+                    ax.set_xlabel('Wind Speed (km/h)')
+                else:
+                    ax.plot([0, intensity], [0, 1], 'orange', linewidth=2)
+                    ax.axvline(x=intensity, color='blue', linestyle='--', linewidth=2)
+                    ax.set_xlabel('Hazard Intensity')
             
-            ax.set_ylabel('Damage Ratio')
-            ax.set_title(f'{hazard_type.title()} Damage Function')
-            ax.legend()
+            ax.set_ylabel('Mean Damage Ratio (MDR)')
+            ax.set_title(f'🌤️ CLIMADA Impact Function: {hazard_type.title()}' if result.get('climada_used') else f'{hazard_type.title()} Damage Function')
+            ax.legend(loc='upper left')
             ax.grid(True, alpha=0.3)
             ax.set_xlim(0, None)
             ax.set_ylim(0, 1.1)
